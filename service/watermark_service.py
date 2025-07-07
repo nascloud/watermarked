@@ -51,7 +51,7 @@ class WatermarkService:
                 image,
                 watermark_image,
                 self.config.get('opacity'),
-                target_width=image.width  # 使用原图宽度
+                max_size=(image.width, image.height)  # 使用原图尺寸
             )
         except Exception as e:
             logger.error(f"创建预览失败: {e}")
@@ -124,7 +124,7 @@ class WatermarkService:
                     image,
                     watermark_image,
                     self.config.get('opacity'),
-                    image.width
+                    max_size=(image.width, image.height)
                 )
 
             output_path = os.path.join(self.config.get('output_folder'), os.path.basename(image_path))

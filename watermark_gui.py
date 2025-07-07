@@ -7,6 +7,7 @@ import sys
 import subprocess
 from config.settings import AppConfig
 from service.watermark_service import WatermarkService
+from core.watermark_algorithm import apply_watermark
 
 class WatermarkGUI:
     def __init__(self):
@@ -232,37 +233,45 @@ class WatermarkGUI:
         """更新预览图像"""
         if not self.input_folder.get() or not self.watermark_path.get():
             return
-        
+
         selection = self.image_listbox.curselection()
         if not selection:
             return
-        
+
         image_name = self.image_listbox.get(selection[0])
         image_path = os.path.join(self.input_folder.get(), image_name)
-        
-        try:
-            # 更新配置
-            self.config.update(
-                watermark_path=self.watermark_path.get(),
-                opacity=self.opacity.get()
-            )
 
-            # 使用服务生成预览
-            watermarked = self.watermark_service.create_preview(image_path)
+        try:
+            image = Image.open(image_path)
+            watermark_path_str = self.watermark_path.get()
+
+            if not watermark_path_str or not os.path.exists(watermark_path_str):
+                watermarked = image
+            else:
+                watermark_image = Image.open(watermark_path_str).convert('RGBA')
+                
+                self.config.update(
+                    watermark_path=watermark_path_str,
+                    opacity=self.opacity.get()
+                )
+                
+                watermarked = apply_watermark(
+                    image,
+                    watermark_image,
+                    self.opacity.get(),
+                    max_size=image.size
+                )
+
             if watermarked:
-                # 调整图片大小以适应预览区域
                 canvas_width = self.preview_canvas.winfo_width()
                 canvas_height = self.preview_canvas.winfo_height()
-                
-                if canvas_width > 1 and canvas_height > 1: #确保画布已渲染
+
+                if canvas_width > 1 and canvas_height > 1:
                     ratio = min(canvas_width / watermarked.width, canvas_height / watermarked.height)
                     new_size = (int(watermarked.width * ratio), int(watermarked.height * ratio))
-                    
                     watermarked = watermarked.resize(new_size, Image.Resampling.LANCZOS)
-                    
-                    # 转换为PhotoImage并显示
+
                     self.preview_image = ImageTk.PhotoImage(watermarked)
-                    
                     self.preview_canvas.delete("all")
                     self.preview_canvas.create_image(
                         canvas_width / 2,
