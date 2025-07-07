@@ -1,0 +1,16 @@
+{
+  "position": {
+    "x": 10,
+    "y": 20,
+    "anchor": "top-left"
+  },
+  "font": {
+    "family": "Arial",
+    "size": 12,
+    "color": "#FF0000"
+  },
+  "output": {
+    "format": "PNG",
+    "quality": 90
+  }
+}

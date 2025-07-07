@@ -2,31 +2,31 @@ import tkinter as tk
 from tkinter import ttk, filedialog, colorchooser, messagebox
 from PIL import Image, ImageTk
 import os
-from watermark import Watermarker
 import json
 import sys
 import subprocess
+from config.settings import AppConfig
+from service.watermark_service import WatermarkService
 
 class WatermarkGUI:
     def __init__(self):
         # 创建主窗口
         self.window = tk.Tk()
-        self.window.title("批量加水印工具1.2")
+        self.window.title("批量加水印工具 2.0")
         self.window.geometry("800x600")
-        
-        # 获取配置文件路径，设置为 AppData 目录
-        appdata_path = os.path.join(os.path.expanduser("~"), "AppData", "Local", "watermark")
-        os.makedirs(appdata_path, exist_ok=True)  # 确保目录存在
-        self.config_file = os.path.join(appdata_path, 'watermark_config.json')
-        
+
+        # 初始化配置和服务
+        self.config = AppConfig()
+        self.watermark_service = WatermarkService(self.config)
+
         # 初始化变量
         self.input_folder = tk.StringVar()
         self.output_folder = tk.StringVar()
         self.watermark_path = tk.StringVar()
-        self.opacity = tk.DoubleVar(value=1)
-        self.target_width_var = tk.IntVar(value=800)  # 默认值为800
-        self.width_option = tk.StringVar(value="uniform")  # 默认选择统一宽度
-        
+        self.opacity = tk.DoubleVar(value=self.config.get('opacity', 1.0))
+        self.target_width_var = tk.IntVar(value=self.config.get('target_width', 800))
+        self.width_option = tk.StringVar(value=self.config.get('width_option', "uniform"))
+
         # 创建主框架
         self.create_main_frame()
         
@@ -241,34 +241,35 @@ class WatermarkGUI:
         image_path = os.path.join(self.input_folder.get(), image_name)
         
         try:
-            # 创建水印器实例
-            watermarker = Watermarker(
+            # 更新配置
+            self.config.update(
                 watermark_path=self.watermark_path.get(),
                 opacity=self.opacity.get()
             )
-            
-            # 加载并处理图片
-            watermarked = watermarker.process_single_image(image_path)
+
+            # 使用服务生成预览
+            watermarked = self.watermark_service.create_preview(image_path)
             if watermarked:
                 # 调整图片大小以适应预览区域
                 canvas_width = self.preview_canvas.winfo_width()
                 canvas_height = self.preview_canvas.winfo_height()
                 
-                ratio = min(canvas_width/watermarked.width, canvas_height/watermarked.height)
-                new_size = (int(watermarked.width * ratio), int(watermarked.height * ratio))
-                
-                watermarked = watermarked.resize(new_size, Image.Resampling.LANCZOS)
-                
-                # 转换为PhotoImage并显示
-                self.preview_image = ImageTk.PhotoImage(watermarked)
-                
-                self.preview_canvas.delete("all")
-                self.preview_canvas.create_image(
-                    canvas_width/2, 
-                    canvas_height/2, 
-                    image=self.preview_image, 
-                    anchor=tk.CENTER
-                )
+                if canvas_width > 1 and canvas_height > 1: #确保画布已渲染
+                    ratio = min(canvas_width / watermarked.width, canvas_height / watermarked.height)
+                    new_size = (int(watermarked.width * ratio), int(watermarked.height * ratio))
+                    
+                    watermarked = watermarked.resize(new_size, Image.Resampling.LANCZOS)
+                    
+                    # 转换为PhotoImage并显示
+                    self.preview_image = ImageTk.PhotoImage(watermarked)
+                    
+                    self.preview_canvas.delete("all")
+                    self.preview_canvas.create_image(
+                        canvas_width / 2,
+                        canvas_height / 2,
+                        image=self.preview_image,
+                        anchor=tk.CENTER
+                    )
         except Exception as e:
             messagebox.showerror("错误", f"预览失败: {str(e)}")
 
@@ -298,50 +299,26 @@ class WatermarkGUI:
         try:
             self.status_var.set("处理中...")
             self.window.update()
-            
-            # 获取总文件数
-            image_files = [f for f in os.listdir(self.input_folder.get()) 
-                          if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp'))]
-            
-            # 确保有效图片列表
-            valid_images = []
-            for image_file in image_files:
-                file_path = os.path.join(self.input_folder.get(), image_file)
-                try:
-                    with Image.open(file_path) as img:
-                        img.verify()  # 验证文件是否为有效的图片
-                    valid_images.append(image_file)
-                except Exception as e:
-                    print(f"无效图片: {image_file} - 错误: {str(e)}")
-            
-            if not valid_images:
-                messagebox.showwarning("警告", "输入文件夹中没有支持的图片文件！")
-                return
-            
-            total_files = len(valid_images)
-            
-            # 如果输出文件夹为空，使用默认路径
-            output_folder = self.output_folder.get() or os.path.join(self.input_folder.get(), 'watermarked')
-            if not os.path.exists(output_folder):
-                os.makedirs(output_folder)
 
-            watermarker = Watermarker(
+            # 更新配置
+            self.config.update(
+                input_folder=self.input_folder.get(),
+                output_folder=self.output_folder.get(),
                 watermark_path=self.watermark_path.get(),
                 opacity=self.opacity.get(),
-                output_folder=output_folder
+                target_width=self.target_width_var.get(),
+                width_option=self.width_option.get()
             )
-            
-            # 处理每个文件并更新进度
-            for i, image_file in enumerate(valid_images, 1):
-                self.status_var.set(f"正在处理: {image_file}")
-                self.progress_var.set((i / total_files) * 100)
+
+            # 定义进度回调函数
+            def progress_callback(current, total, filename):
+                self.status_var.set(f"正在处理: {filename}")
+                self.progress_var.set((current / total) * 100)
                 self.window.update()
-                
-                image_path = os.path.join(self.input_folder.get(), image_file)
-                print(f"处理图片路径: {image_path}")  # 添加调试信息
-                print(f"有效图片列表: {valid_images}")  # 输出有效图片列表
-                watermarker.process_single_image(image_path)
-            
+
+            # 调用服务进行处理
+            self.watermark_service.process_images_with_progress(progress_callback)
+
             self.status_var.set("处理完成！")
             self.progress_var.set(100)
             if messagebox.askyesno("完成", "图片处理完成！是否打开输出文件夹？"):
@@ -368,15 +345,6 @@ class WatermarkGUI:
             messagebox.showerror("错误", "不透明度必须在0-1之间！")
             return False
         
-        # 确保输出文件夹存在
-        output_folder = self.output_folder.get() or os.path.join(self.input_folder.get(), 'watermarked')
-        if not os.path.exists(output_folder):
-            try:
-                os.makedirs(output_folder)
-            except Exception as e:
-                messagebox.showerror("错误", f"创建输出文件夹失败: {str(e)}")
-                return False
-        
         return True
 
     def get_app_path(self):
@@ -390,28 +358,21 @@ class WatermarkGUI:
 
     def save_config(self):
         """保存配置到文件"""
-        config = {
-            'watermark_path': self.watermark_path.get(),
-            'opacity': self.opacity.get(),
-        }
-        
-        try:
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(config, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            messagebox.showerror("错误", f"保存配置失败: {str(e)}")
+        self.config.update(
+            watermark_path=self.watermark_path.get(),
+            opacity=self.opacity.get(),
+            target_width=self.target_width_var.get(),
+            width_option=self.width_option.get()
+        )
+        self.config.save()
 
     def load_config(self):
         """从文件加载配置"""
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    
-                self.watermark_path.set(config.get('watermark_path', ''))
-                self.opacity.set(config.get('opacity', 1))  # 默认不透明度改为1
-        except Exception as e:
-            messagebox.showwarning("警告", f"加载配置失败: {str(e)}")
+        self.config.load()
+        self.watermark_path.set(self.config.get('watermark_path', ''))
+        self.opacity.set(self.config.get('opacity', 1.0))
+        self.target_width_var.set(self.config.get('target_width', 800))
+        self.width_option.set(self.config.get('width_option', 'uniform'))
 
     def on_setting_changed(self, *args):
         """当设置改变时更新预览"""
