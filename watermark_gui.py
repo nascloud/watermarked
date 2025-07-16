@@ -8,12 +8,13 @@ import subprocess
 from config.settings import AppConfig
 from service.watermark_service import WatermarkService
 from core.watermark_algorithm import apply_watermark
+from version import get_app_title
 
 class WatermarkGUI:
     def __init__(self):
         # 创建主窗口
         self.window = tk.Tk()
-        self.window.title("批量加水印工具 2.0")
+        self.window.title(get_app_title())
         self.window.geometry("800x600")
 
         # 初始化配置和服务
@@ -231,7 +232,7 @@ class WatermarkGUI:
 
     def update_preview(self):
         """更新预览图像"""
-        if not self.input_folder.get() or not self.watermark_path.get():
+        if not self.input_folder.get():
             return
 
         selection = self.image_listbox.curselection()
@@ -242,25 +243,20 @@ class WatermarkGUI:
         image_path = os.path.join(self.input_folder.get(), image_name)
 
         try:
-            image = Image.open(image_path)
-            watermark_path_str = self.watermark_path.get()
+            # 更新配置以确保预览使用最新设置
+            self.config.update(
+                watermark_path=self.watermark_path.get(),
+                opacity=self.opacity.get(),
+                target_width=self.target_width_var.get(),
+                width_option=self.width_option.get()
+            )
 
-            if not watermark_path_str or not os.path.exists(watermark_path_str):
-                watermarked = image
-            else:
-                watermark_image = Image.open(watermark_path_str).convert('RGBA')
-                
-                self.config.update(
-                    watermark_path=watermark_path_str,
-                    opacity=self.opacity.get()
-                )
-                
-                watermarked = apply_watermark(
-                    image,
-                    watermark_image,
-                    self.opacity.get(),
-                    max_size=image.size
-                )
+            # 使用服务创建预览，确保与实际处理逻辑一致
+            watermarked = self.watermark_service.create_preview(image_path)
+
+            if not watermarked:
+                # 如果服务返回None，则直接显示原图
+                watermarked = Image.open(image_path)
 
             if watermarked:
                 canvas_width = self.preview_canvas.winfo_width()

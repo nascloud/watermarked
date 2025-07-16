@@ -28,30 +28,35 @@ class WatermarkService:
         """
         为指定的单个图片创建水印预览。
 
-        此方法会加载图片和水印，然后应用水印效果，返回一个可供预览的
-        Pillow Image 对象。如果水印未设置，则返回原始图片。
+        此方法会按照与实际处理相同的顺序：先统一宽度，再添加水印。
+        如果水印未设置，则返回调整宽度后的图片。
 
         Args:
             image_path (str): 要创建预览的图片的路径。
 
         Returns:
-            Optional[Image.Image]: 添加了水印的预览图像对象，如果发生错误则返回 None。
-        
+            Optional[Image.Image]: 处理后的预览图像对象，如果发生错误则返回 None。
+
         Raises:
             Exception: 如果在处理过程中发生任何错误。
         """
         try:
             image = Image.open(image_path)
+
+            # 第一步：根据配置统一图像宽度（与实际处理保持一致）
+            target_width = self.config.get('target_width')
+            if self.config.get('width_option') == 'uniform':
+                image = resize_image(image, target_width)
+
+            # 第二步：添加水印
             watermark_image = self._get_watermark_image()
             if not watermark_image:
-                return image  # 如果没有水印，返回原图
-            
-            # 在预览时，我们直接应用水印，不调整大小
+                return image  # 如果没有水印，返回调整宽度后的图片
+
             return apply_watermark(
                 image,
                 watermark_image,
-                self.config.get('opacity'),
-                max_size=(image.width, image.height)  # 使用原图尺寸
+                self.config.get('opacity')
             )
         except Exception as e:
             logger.error(f"创建预览失败: {e}")
@@ -97,45 +102,47 @@ class WatermarkService:
 
     def process_single_image(self, image_path: str):
         """
-        处理单个图片文件：添加水印并保存到输出目录。
+        处理单个图片文件：先统一宽度，再添加水印，最后保存到输出目录。
 
-        根据配置，此方法可能会先调整图片大小，然后应用水印，
-        最后将处理后的图片保存到指定的输出文件夹。
+        处理顺序：
+        1. 加载原始图片
+        2. 根据配置统一图片宽度（如果需要）
+        3. 添加水印
+        4. 保存到输出文件夹
 
         Args:
             image_path (str): 要处理的图片的完整路径。
-        
+
         Raises:
             Exception: 如果在打开、处理或保存图片时发生错误。
         """
         try:
             image = Image.open(image_path)
-            
+
+            # 第一步：根据配置统一图像宽度
             target_width = self.config.get('target_width')
-            
-            # 根据配置调整图像宽度
-            if self.config.get('width_option') == 'uniform' and image.width > target_width:
+            if self.config.get('width_option') == 'uniform':
                 image = resize_image(image, target_width)
 
+            # 第二步：添加水印
             watermark_image = self._get_watermark_image()
             if watermark_image:
-                # 将当前图像的宽度传递给 apply_watermark，以确保水印大小与（可能已调整的）图像匹配
                 image = apply_watermark(
                     image,
                     watermark_image,
-                    self.config.get('opacity'),
-                    max_size=(image.width, image.height)
+                    self.config.get('opacity')
                 )
 
+            # 第三步：保存图片
             output_path = os.path.join(self.config.get('output_folder'), os.path.basename(image_path))
-            
+
             # 对于有损格式，确保在保存前转换为 RGB
             if image_path.lower().endswith(('.jpg', '.jpeg')):
                 if image.mode == 'RGBA':
                     image = image.convert('RGB')
-            
+
             image.save(output_path, quality=95)
-            
+
         except Exception as e:
             logger.error(f"处理图片 {image_path} 时出错: {str(e)}")
             raise

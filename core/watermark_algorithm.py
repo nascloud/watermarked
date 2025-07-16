@@ -1,20 +1,25 @@
 import math
 from PIL import Image
 
-def resize_image(image: Image.Image, max_size: tuple = (800, 800)) -> Image.Image:
+def resize_image(image: Image.Image, target_width: int) -> Image.Image:
     """
-    按比例调整图像大小以适应最大尺寸，同时保持其纵横比。
+    按比例调整图像大小以适应目标宽度，同时保持其纵横比。
 
     Args:
         image (Image.Image): Pillow Image 对象。
-        max_size (tuple, optional): (宽度, 高度) 的元组，表示最大尺寸。
-                                    默认为 (800, 800)。
+        target_width (int): 目标宽度（像素）。
 
     Returns:
         Image.Image: 调整大小后的 Pillow Image 对象。
     """
-    image.thumbnail(max_size, Image.Resampling.LANCZOS)
-    return image
+    if image.width <= target_width:
+        return image
+
+    # 计算新的高度，保持宽高比
+    ratio = target_width / image.width
+    new_height = int(image.height * ratio)
+
+    return image.resize((target_width, new_height), Image.Resampling.LANCZOS)
 
 def create_watermark_layer(target_size: tuple, watermark_image: Image.Image, opacity: float) -> Image.Image:
     """
@@ -53,27 +58,24 @@ def create_watermark_layer(target_size: tuple, watermark_image: Image.Image, opa
     
     return layer
 
-def apply_watermark(image: Image.Image, watermark_image: Image.Image, opacity: float, max_size: tuple = (800, 800)) -> Image.Image:
+def apply_watermark(image: Image.Image, watermark_image: Image.Image, opacity: float) -> Image.Image:
     """
     为单个图片应用水印。
 
-    此函数会先调整原图大小，然后创建一个水印层，最后将水印层合成到原图上。
+    此函数直接在传入的图片上添加水印，不进行大小调整。
+    大小调整应该在调用此函数之前完成。
 
     Args:
         image (Image.Image): 需要添加水印的 Pillow Image 对象。
         watermark_image (Image.Image): 用作水印的 Pillow Image 对象。
         opacity (float): 水印的不透明度。
-        max_size (tuple, optional): 添加水印前，原图将被调整到的最大尺寸。
-                                     默认为 (800, 800)。
 
     Returns:
         Image.Image: 添加了水印的 Pillow Image 对象。
     """
-    image = resize_image(image, max_size)
-    
     if image.mode != 'RGBA':
         image = image.convert('RGBA')
-    
+
     watermark_layer = create_watermark_layer(image.size, watermark_image, opacity)
-    
+
     return Image.alpha_composite(image, watermark_layer)
