@@ -25,9 +25,9 @@ def resize_image(image: Image.Image, target_width: int) -> Image.Image:
     ratio = target_width / image.width
     new_height = int(image.height * ratio)
 
-    # 如果是缩小图片（ratio < 1），使用LANCZOS算法
+    # 如果是缩小图片（ratio < 1），使用优化的缩小算法
     if ratio <= 1.0:
-        return image.resize((target_width, new_height), Image.Resampling.LANCZOS)
+        return _optimized_downscale(image, target_width, new_height, ratio)
 
     # 如果是放大图片，根据放大倍数选择不同策略
     if ratio < 2.0:
@@ -113,6 +113,102 @@ def _progressive_upscale(image: Image.Image, target_width: int, target_height: i
 
     # 最后一步应用更强的锐化
     return _apply_sharpening(current_image, strength=0.4)
+
+def _optimized_downscale(image: Image.Image, target_width: int, target_height: int, ratio: float) -> Image.Image:
+    """
+    优化的图片缩小算法，保持更好的画质和细节。
+
+    使用多种技术来提升缩小后的图片质量：
+    1. 预锐化：在缩小前轻微锐化以保持细节
+    2. 分步缩小：对于大幅缩小使用分步处理
+    3. 高质量重采样：选择最适合的重采样算法
+    4. 后处理：缩小后进行细节增强
+
+    Args:
+        image (Image.Image): 原始图像。
+        target_width (int): 目标宽度。
+        target_height (int): 目标高度。
+        ratio (float): 缩放比例（< 1.0）。
+
+    Returns:
+        Image.Image: 优化缩小后的图像。
+    """
+    # 如果缩小幅度不大（> 0.5），使用简单优化
+    if ratio > 0.5:
+        return _simple_downscale_with_enhancement(image, target_width, target_height)
+
+    # 如果是大幅缩小（<= 0.5），使用分步缩小
+    return _progressive_downscale(image, target_width, target_height, ratio)
+
+def _simple_downscale_with_enhancement(image: Image.Image, target_width: int, target_height: int) -> Image.Image:
+    """
+    简单缩小的优化版本，适用于轻微到中等程度的缩小。
+
+    Args:
+        image (Image.Image): 原始图像。
+        target_width (int): 目标宽度。
+        target_height (int): 目标高度。
+
+    Returns:
+        Image.Image: 优化后的图像。
+    """
+    # 步骤1：预锐化，在缩小前轻微增强细节
+    pre_sharpened = _apply_sharpening(image, strength=0.2)
+
+    # 步骤2：使用高质量LANCZOS重采样
+    resized = pre_sharpened.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+    # 步骤3：后处理 - 轻微锐化以恢复细节
+    return _apply_sharpening(resized, strength=0.3)
+
+def _progressive_downscale(image: Image.Image, target_width: int, target_height: int, final_ratio: float) -> Image.Image:
+    """
+    分步缩小算法，适用于大幅缩小的情况。
+
+    通过多个步骤逐步缩小图像，每步最多缩小到0.6倍，
+    这样可以更好地保持图像质量和细节。
+
+    Args:
+        image (Image.Image): 原始图像。
+        target_width (int): 目标宽度。
+        target_height (int): 目标高度。
+        final_ratio (float): 最终缩放比例。
+
+    Returns:
+        Image.Image: 分步缩小后的图像。
+    """
+    current_image = image
+    current_width = image.width
+    current_height = image.height
+
+    # 预锐化原图
+    current_image = _apply_sharpening(current_image, strength=0.15)
+
+    # 分步缩小，每次最多缩小到0.6倍
+    while current_width > target_width:
+        # 计算这一步的缩放比例，最小0.6
+        step_ratio = max(0.6, target_width / current_width)
+
+        new_width = int(current_width * step_ratio)
+        new_height = int(current_height * step_ratio)
+
+        # 确保不小于目标尺寸
+        if new_width < target_width:
+            new_width = target_width
+            new_height = target_height
+
+        # 使用LANCZOS进行这一步的缩小
+        current_image = current_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # 在中间步骤应用轻微锐化
+        if new_width > target_width:  # 不是最后一步
+            current_image = _apply_sharpening(current_image, strength=0.2)
+
+        current_width = new_width
+        current_height = new_height
+
+    # 最后一步应用细节增强
+    return _apply_sharpening(current_image, strength=0.35)
 
 def create_watermark_layer(target_size: tuple, watermark_image: Image.Image, opacity: float) -> Image.Image:
     """

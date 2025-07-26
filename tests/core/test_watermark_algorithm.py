@@ -77,5 +77,39 @@ class TestWatermarkAlgorithm(unittest.TestCase):
         expected_height = int(original_image.size[1] * (target_width / original_image.size[0]))
         self.assertEqual(resized_image.size[1], expected_height)
 
+    def test_resize_image_moderate_downscale(self):
+        """测试中等程度缩小的优化算法"""
+        # 创建一个大图片
+        original_image = Image.new('RGB', (1000, 800), 'white')
+
+        # 目标宽度为 600（0.6倍缩小）
+        target_width = 600
+        resized_image = resize_image(original_image, target_width)
+
+        # 检查尺寸是否正确
+        self.assertEqual(resized_image.size[0], target_width)
+        expected_height = int(original_image.size[1] * (target_width / original_image.size[0]))
+        self.assertEqual(resized_image.size[1], expected_height)
+
+        # 验证返回的是新图片对象
+        self.assertIsNot(resized_image, original_image)
+
+    def test_resize_image_large_downscale(self):
+        """测试大幅缩小时的分步算法"""
+        # 创建一个很大的图片
+        original_image = Image.new('RGB', (2000, 1500), 'white')
+
+        # 目标宽度为 400（0.2倍缩小）
+        target_width = 400
+        resized_image = resize_image(original_image, target_width)
+
+        # 检查尺寸是否正确
+        self.assertEqual(resized_image.size[0], target_width)
+        expected_height = int(original_image.size[1] * (target_width / original_image.size[0]))
+        self.assertEqual(resized_image.size[1], expected_height)
+
+        # 验证返回的是新图片对象
+        self.assertIsNot(resized_image, original_image)
+
 if __name__ == '__main__':
     unittest.main()
