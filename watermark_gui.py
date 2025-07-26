@@ -29,6 +29,13 @@ class WatermarkGUI:
         self.target_width_var = tk.IntVar(value=self.config.get('target_width', 800))
         self.width_option = tk.StringVar(value=self.config.get('width_option', "uniform"))
 
+        # 为变量添加trace回调，当值改变时自动更新预览
+        self.target_width_var.trace('w', self.on_setting_changed)
+        self.width_option.trace('w', self.on_setting_changed)
+        self.opacity.trace('w', self.on_setting_changed)
+        self.watermark_path.trace('w', self.on_watermark_changed)
+        self.input_folder.trace('w', self.on_input_folder_changed)
+
         # 创建主框架
         self.create_main_frame()
         
@@ -76,19 +83,31 @@ class WatermarkGUI:
         ttk.Label(parent, text="水印图片（800*800）:").pack(anchor=tk.W, padx=5, pady=2)
         watermark_frame = ttk.Frame(parent)
         watermark_frame.pack(fill=tk.X, padx=5, pady=2)
-        ttk.Entry(watermark_frame, textvariable=self.watermark_path).pack(side=tk.LEFT, expand=True, fill=tk.X)
+        watermark_entry = ttk.Entry(watermark_frame, textvariable=self.watermark_path)
+        watermark_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        # 绑定水印路径变化事件
+        watermark_entry.bind("<KeyRelease>", self.on_setting_changed)
+        watermark_entry.bind("<FocusOut>", self.on_setting_changed)
         ttk.Button(watermark_frame, text="选择水印", command=self.select_watermark).pack(side=tk.RIGHT)
         
         # 目标宽度输入
         ttk.Label(parent, text="统一输出图片宽度（像素）:").pack(anchor=tk.W, padx=5, pady=2)
         target_width_entry = ttk.Entry(parent, textvariable=self.target_width_var)
         target_width_entry.pack(fill=tk.X, padx=5, pady=2)
+        # 绑定目标宽度变化事件
+        target_width_entry.bind("<KeyRelease>", self.on_setting_changed)
+        target_width_entry.bind("<FocusOut>", self.on_setting_changed)
 
         # 选择宽度选项
         width_option_frame = ttk.Frame(parent)  # 新建一个框架
         width_option_frame.pack(anchor=tk.W, padx=5, pady=2)
-        ttk.Radiobutton(width_option_frame, text="统一宽度", variable=self.width_option, value="uniform").pack(side=tk.LEFT)
-        ttk.Radiobutton(width_option_frame, text="保持原始宽度", variable=self.width_option, value="original").pack(side=tk.LEFT)
+        uniform_radio = ttk.Radiobutton(width_option_frame, text="统一宽度", variable=self.width_option, value="uniform")
+        uniform_radio.pack(side=tk.LEFT)
+        uniform_radio.bind("<Button-1>", self.on_setting_changed)
+
+        original_radio = ttk.Radiobutton(width_option_frame, text="保持原始宽度", variable=self.width_option, value="original")
+        original_radio.pack(side=tk.LEFT)
+        original_radio.bind("<Button-1>", self.on_setting_changed)
 
         # 透明度
         ttk.Label(parent, text="不透明度:").pack(anchor=tk.W, padx=5, pady=2)
@@ -101,7 +120,11 @@ class WatermarkGUI:
         ttk.Label(parent, text="输入文件夹:").pack(anchor=tk.W, padx=5, pady=2)
         input_frame = ttk.Frame(parent)
         input_frame.pack(fill=tk.X, padx=5, pady=2)
-        ttk.Entry(input_frame, textvariable=self.input_folder).pack(side=tk.LEFT, expand=True, fill=tk.X)
+        input_folder_entry = ttk.Entry(input_frame, textvariable=self.input_folder)
+        input_folder_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        # 绑定输入文件夹变化事件
+        input_folder_entry.bind("<KeyRelease>", self.on_input_folder_entry_changed)
+        input_folder_entry.bind("<FocusOut>", self.on_input_folder_entry_changed)
         ttk.Button(input_frame, text="浏览", command=self.select_input_folder).pack(side=tk.RIGHT)
         
         ttk.Label(parent, text="输出文件夹（默认在原目录）:").pack(anchor=tk.W, padx=5, pady=2)
@@ -141,6 +164,8 @@ class WatermarkGUI:
         # 创建预览画布
         self.preview_canvas = tk.Canvas(parent, bg='white')
         self.preview_canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 绑定画布大小变化事件，当窗口调整大小时重新调整预览
+        self.preview_canvas.bind('<Configure>', self.on_canvas_configure)
 
     def create_status_bar(self):
         """创建状态栏"""
@@ -385,6 +410,43 @@ class WatermarkGUI:
         if hasattr(self, '_update_timer'):
             self.window.after_cancel(self._update_timer)
         self._update_timer = self.window.after(100, self.update_preview)
+
+    def on_watermark_changed(self, *args):
+        """当水印路径改变时更新预览"""
+        # 验证水印文件是否存在
+        watermark_path = self.watermark_path.get()
+        if watermark_path and os.path.exists(watermark_path):
+            self.on_setting_changed()
+
+    def on_input_folder_changed(self, *args):
+        """当输入文件夹路径改变时更新图片列表"""
+        # 使用after方法延迟更新，避免频繁刷新
+        if hasattr(self, '_folder_update_timer'):
+            self.window.after_cancel(self._folder_update_timer)
+        self._folder_update_timer = self.window.after(500, self._delayed_folder_update)
+
+    def on_input_folder_entry_changed(self, *args):
+        """当用户在输入框中手动输入文件夹路径时"""
+        # 验证路径是否存在
+        folder_path = self.input_folder.get()
+        if folder_path and os.path.exists(folder_path) and os.path.isdir(folder_path):
+            self.on_input_folder_changed()
+
+    def _delayed_folder_update(self):
+        """延迟更新文件夹内容"""
+        folder_path = self.input_folder.get()
+        if folder_path and os.path.exists(folder_path) and os.path.isdir(folder_path):
+            # 自动设置输出文件夹
+            if not self.output_folder.get():
+                self.output_folder.set(os.path.join(folder_path, 'watermarked'))
+            self.update_image_list()
+
+    def on_canvas_configure(self, event):
+        """当画布大小改变时重新调整预览"""
+        # 使用after方法延迟更新，避免频繁刷新
+        if hasattr(self, '_canvas_update_timer'):
+            self.window.after_cancel(self._canvas_update_timer)
+        self._canvas_update_timer = self.window.after(200, self.update_preview)
 
     def run(self):
         """运行主循环"""

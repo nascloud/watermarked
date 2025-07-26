@@ -5,6 +5,9 @@ def resize_image(image: Image.Image, target_width: int) -> Image.Image:
     """
     按比例调整图像大小以适应目标宽度，同时保持其纵横比。
 
+    无论原图宽度是大于还是小于目标宽度，都会调整到目标宽度，
+    以实现真正的"统一宽度"效果。
+
     Args:
         image (Image.Image): Pillow Image 对象。
         target_width (int): 目标宽度（像素）。
@@ -12,7 +15,8 @@ def resize_image(image: Image.Image, target_width: int) -> Image.Image:
     Returns:
         Image.Image: 调整大小后的 Pillow Image 对象。
     """
-    if image.width <= target_width:
+    # 如果图片宽度已经等于目标宽度，直接返回
+    if image.width == target_width:
         return image
 
     # 计算新的高度，保持宽高比
