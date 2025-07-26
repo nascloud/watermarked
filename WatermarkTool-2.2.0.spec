@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='批量加水印工具-2.1.0',
+    name='WatermarkTool-2.2.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

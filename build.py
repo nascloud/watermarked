@@ -31,67 +31,87 @@ def print_build_info():
 def clean_build():
     """清理构建目录"""
     print("清理构建目录...")
-    
+
     dirs_to_clean = ['build', 'dist', '*.egg-info']
     for dir_pattern in dirs_to_clean:
         for path in Path('.').glob(dir_pattern):
-            if path.is_dir():
-                print(f"删除目录: {path}")
-                shutil.rmtree(path)
-            elif path.is_file():
-                print(f"删除文件: {path}")
-                path.unlink()
+            try:
+                if path.is_dir():
+                    print(f"删除目录: {path}")
+                    shutil.rmtree(path, ignore_errors=True)
+                elif path.is_file():
+                    print(f"删除文件: {path}")
+                    path.unlink()
+            except (PermissionError, OSError) as e:
+                print(f"警告: 无法删除 {path}: {e}")
+                continue
 
 
 def build_with_pyinstaller():
     """使用 PyInstaller 构建可执行文件"""
     print("使用 PyInstaller 构建可执行文件...")
-    
+
     version = get_version()
-    app_name = get_build_info()['name']
-    
-    # PyInstaller 命令
+    # 使用英文文件名避免编码问题
+    exe_name = f"WatermarkTool-{version}"
+
+    # PyInstaller 命令 - 使用python -m PyInstaller避免路径问题
     cmd = [
-        'pyinstaller',
+        sys.executable, '-m', 'PyInstaller',
         '--onefile',                    # 打包成单个文件
         '--windowed',                   # Windows 下不显示控制台
-        '--name', f"{app_name}-{version}",  # 可执行文件名称
+        '--name', exe_name,             # 可执行文件名称（使用英文）
         '--add-data', 'config;config',  # 包含配置目录
+        '--clean',                      # 清理临时文件
         'watermark_gui.py'              # 主程序文件
     ]
-    
+
     try:
         subprocess.run(cmd, check=True)
-        print(f"构建成功! 可执行文件位于: dist/{app_name}-{version}.exe")
+        print(f"构建成功! 可执行文件位于: dist/{exe_name}.exe")
+
+        # 创建一个带中文名的副本
+        chinese_name = f"批量加水印工具-{version}.exe"
+        src_path = Path(f"dist/{exe_name}.exe")
+        dst_path = Path(f"dist/{chinese_name}")
+
+        if src_path.exists():
+            shutil.copy2(src_path, dst_path)
+            print(f"已创建中文名副本: dist/{chinese_name}")
+
     except subprocess.CalledProcessError as e:
         print(f"构建失败: {e}")
         return False
     except FileNotFoundError:
         print("错误: 未找到 PyInstaller。请先安装: pip install pyinstaller")
         return False
-    
+
     return True
 
 
 def build_with_setuptools():
     """使用 setuptools 构建分发包"""
     print("使用 setuptools 构建分发包...")
-    
+
     try:
-        # 构建源码分发包
-        subprocess.run([sys.executable, 'setup.py', 'sdist'], check=True)
-        
-        # 构建 wheel 包
-        subprocess.run([sys.executable, 'setup.py', 'bdist_wheel'], check=True)
-        
-        print("构建成功! 分发包位于 dist/ 目录")
+        # 使用 build 模块构建（现代方式）
+        try:
+            subprocess.run([sys.executable, '-m', 'build'], check=True)
+            print("构建成功! 分发包位于 dist/ 目录")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # 如果没有 build 模块，尝试使用 pip
+            print("尝试使用 pip 构建...")
+            subprocess.run([sys.executable, '-m', 'pip', 'wheel', '.', '--wheel-dir', 'dist'], check=True)
+            print("构建成功! wheel 包位于 dist/ 目录")
+
     except subprocess.CalledProcessError as e:
         print(f"构建失败: {e}")
+        print("提示: 可以尝试安装 build 模块: pip install build")
         return False
     except FileNotFoundError:
-        print("错误: 未找到 setup.py 文件")
+        print("错误: 未找到必要的构建工具")
         return False
-    
+
     return True
 
 
