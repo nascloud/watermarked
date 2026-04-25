@@ -53,7 +53,8 @@ class AppConfig:
             "output_width_option": "original",
             "output_target_width": 1440,
             "input_folder": "",
-            "output_folder": ""
+            "output_folder": "",
+            "upscale_algorithm": "edge",
         }
         for key, value in defaults.items():
             self.config.setdefault(key, value)
@@ -82,6 +83,9 @@ class AppConfig:
 
         if self.get('output_width_option') not in ["uniform", "original"]:
             raise ValueError("配置 'output_width_option' 必须是 'uniform' 或 'original'")
+
+        if self.get('upscale_algorithm') not in ["lanczos", "cubic", "edge", "deep"]:
+            raise ValueError("配置 'upscale_algorithm' 必须是 'lanczos', 'cubic', 'edge' 或 'deep'")
 
         watermark_path = self.get('watermark_path')
         if watermark_path and not os.path.isfile(watermark_path):

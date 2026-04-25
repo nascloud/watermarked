@@ -1,14 +1,25 @@
 import math
 from PIL import Image, ImageFilter
 
+from core.ai_super_resolution import ai_upscale_image, get_available_algorithms
+
+# 放大算法类型：True = 使用AI算法，False = 使用传统LANCZOS
+USE_AI_UPSCALE = True
+DEFAULT_ALGORITHM = "edge"
+
+
+def get_algorithm() -> str:
+    """获取当前配置的超分辨率算法"""
+    return DEFAULT_ALGORITHM if USE_AI_UPSCALE else "lanczos"
+
 def resize_image(image: Image.Image, target_width: int) -> Image.Image:
     """
     按比例调整图像大小以适应目标宽度，同时保持其纵横比。
 
-    当需要放大图片时，使用优化的算法来提高清晰度：
-    - 对于小幅放大（<2倍），使用LANCZOS算法
-    - 对于大幅放大（>=2倍），使用分步放大和锐化处理
-    - 对于缩小，使用LANCZOS算法
+    当需要放大图片时，使用AI增强算法来提高清晰度：
+    - 使用OpenCV的边缘引导超分辨率（edge算法）
+    - 支持GPU加速（如有CUDA）
+    - 对于大幅放大使用分步处理
 
     Args:
         image (Image.Image): Pillow Image 对象。
@@ -25,11 +36,15 @@ def resize_image(image: Image.Image, target_width: int) -> Image.Image:
     ratio = target_width / image.width
     new_height = int(image.height * ratio)
 
-    # 如果是缩小图片（ratio < 1），使用优化的缩小算法
+    # 如果是放大图片（ratio > 1.0）
+    if ratio > 1.0 and USE_AI_UPSCALE:
+        return ai_upscale_image(image, target_width, algorithm="edge")
+
+    # 如果是缩小图片（ratio < 1.0），使用优化的缩小算法
     if ratio <= 1.0:
         return _optimized_downscale(image, target_width, new_height, ratio)
 
-    # 如果是放大图片，根据放大倍数选择不同策略
+    # 小幅放大（不使用AI）
     if ratio < 2.0:
         # 小幅放大：直接使用LANCZOS算法
         resized = image.resize((target_width, new_height), Image.Resampling.LANCZOS)

@@ -55,9 +55,9 @@ def build_with_pyinstaller():
     # 使用英文文件名避免编码问题
     exe_name = f"WatermarkTool-{version}"
 
-    # PyInstaller 命令 - 使用python -m PyInstaller避免路径问题
+    # PyInstaller 命令 - 使用 uv run 避免路径问题
     cmd = [
-        sys.executable, '-m', 'PyInstaller',
+        'uv', 'run', 'PyInstaller',
         '--onefile',                    # 打包成单个文件
         '--windowed',                   # Windows 下不显示控制台
         '--name', exe_name,             # 可执行文件名称（使用英文）
@@ -83,7 +83,7 @@ def build_with_pyinstaller():
         print(f"构建失败: {e}")
         return False
     except FileNotFoundError:
-        print("错误: 未找到 PyInstaller。请先安装: pip install pyinstaller")
+        print("错误: 未找到 PyInstaller。请先安装: uv pip install pyinstaller")
         return False
 
     return True
@@ -94,19 +94,12 @@ def build_with_setuptools():
     print("使用 setuptools 构建分发包...")
 
     try:
-        # 使用 build 模块构建（现代方式）
-        try:
-            subprocess.run([sys.executable, '-m', 'build'], check=True)
-            print("构建成功! 分发包位于 dist/ 目录")
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            # 如果没有 build 模块，尝试使用 pip
-            print("尝试使用 pip 构建...")
-            subprocess.run([sys.executable, '-m', 'pip', 'wheel', '.', '--wheel-dir', 'dist'], check=True)
-            print("构建成功! wheel 包位于 dist/ 目录")
+        # 使用 uv run 调用 build 模块
+        subprocess.run(['uv', 'run', 'python', '-m', 'build'], check=True)
+        print("构建成功! 分发包位于 dist/ 目录")
 
     except subprocess.CalledProcessError as e:
         print(f"构建失败: {e}")
-        print("提示: 可以尝试安装 build 模块: pip install build")
         return False
     except FileNotFoundError:
         print("错误: 未找到必要的构建工具")

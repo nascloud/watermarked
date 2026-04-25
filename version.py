@@ -6,12 +6,12 @@
 """
 
 # 主版本号.次版本号.修订号
-VERSION = "2.2.0"
+VERSION = "2.4.0"
 
 # 版本信息
 VERSION_INFO = {
     "major": 2,
-    "minor": 2,
+    "minor": 4,
     "patch": 0,
     "pre_release": None,  # 例如: "alpha", "beta", "rc1" 等
 }
