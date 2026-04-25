@@ -3,8 +3,22 @@ __pycache__/
 *.py[oc]
 build/
 dist/
-wheels/
+ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
+
+# PyInstaller spec files
+*.spec
+
+# Release notes (keep locally)
+RELEASE-*.md
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
