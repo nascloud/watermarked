@@ -26,26 +26,26 @@
 ### 1. 查看当前版本
 
 ```bash
-python update_version.py --show
+uv run python update_version.py --show
 ```
 
 ### 2. 更新版本号
 
 #### 设置完整版本号
 ```bash
-python update_version.py 2.1.0
+uv run python update_version.py 2.1.0
 ```
 
 #### 增量更新
 ```bash
 # 增加主版本号 (2.1.0 -> 3.0.0)
-python update_version.py --major
+uv run python update_version.py --major
 
 # 增加次版本号 (2.1.0 -> 2.2.0)  
-python update_version.py --minor
+uv run python update_version.py --minor
 
 # 增加修订号 (2.1.0 -> 2.1.1)
-python update_version.py --patch
+uv run python update_version.py --patch
 ```
 
 ### 3. 在代码中使用版本信息
@@ -54,10 +54,10 @@ python update_version.py --patch
 from version import get_version, get_app_title, get_build_info
 
 # 获取版本号
-version = get_version()  # "2.1.0"
+version = get_version()  # "2.4.0"
 
 # 获取应用标题
-title = get_app_title()  # "批量加水印工具 2.1.0"
+title = get_app_title()  # "批量加水印工具 2.4.0"
 
 # 获取构建信息
 info = get_build_info()
@@ -68,19 +68,19 @@ info = get_build_info()
 #### 使用构建脚本
 ```bash
 # 查看构建选项
-python build.py --help
+uv run python build.py --help
 
 # 清理构建目录
-python build.py --clean
+uv run python build.py --clean
 
 # 使用 PyInstaller 构建可执行文件
-python build.py --pyinstaller
+uv run python build.py --pyinstaller
 
 # 创建发布说明
-python build.py --release-notes
+uv run python build.py --release-notes
 
 # 执行完整构建流程
-python build.py --all
+uv run python build.py --all
 ```
 
 #### 手动使用 PyInstaller
@@ -98,7 +98,7 @@ GUI 窗口标题会自动使用版本信息：
 # watermark_gui.py
 from version import get_app_title
 
-self.window.title(get_app_title())  # 自动显示 "批量加水印工具 2.1.0"
+self.window.title(get_app_title())  # 自动显示 "批量加水印工具 2.4.0"
 ```
 
 ### setuptools 集成
@@ -129,24 +129,24 @@ description = "一个用于批量添加水印的图片处理工具"
 
 1. **开发完成后更新版本号**
    ```bash
-   python update_version.py --minor  # 或其他适当的更新
+   uv run python update_version.py --minor  # 或其他适当的更新
    ```
 
 2. **测试应用程序**
    ```bash
-   python watermark_gui.py
+   uv run python watermark_gui.py
    ```
 
 3. **构建发布版本**
    ```bash
-   python build.py --all
+   uv run python build.py --all
    ```
 
 4. **提交代码**
    ```bash
    git add .
-   git commit -m "Release v$(python -c 'from version import get_version; print(get_version())')"
-   git tag v$(python -c 'from version import get_version; print(get_version())')
+   git commit -m "Release v$(uv run python -c 'from version import get_version; print(get_version())')"
+   git tag v$(uv run python -c 'from version import get_version; print(get_version())')
    ```
 
 ## 自定义配置
