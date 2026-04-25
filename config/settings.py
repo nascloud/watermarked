@@ -48,8 +48,10 @@ class AppConfig:
         defaults = {
             "watermark_path": "",
             "opacity": 1.0,
-            "target_width": 800,
-            "width_option": "uniform",
+            "target_width": 1440,
+            "width_option": "original",
+            "output_width_option": "original",
+            "output_target_width": 1440,
             "input_folder": "",
             "output_folder": ""
         }
@@ -72,8 +74,14 @@ class AppConfig:
         if not isinstance(self.get('target_width'), int) or self.get('target_width') <= 0:
             raise ValueError("配置 'target_width' 必须是正整数")
 
+        if not isinstance(self.get('output_target_width'), int) or self.get('output_target_width') <= 0:
+            raise ValueError("配置 'output_target_width' 必须是正整数")
+
         if self.get('width_option') not in ["uniform", "original"]:
             raise ValueError("配置 'width_option' 必须是 'uniform' 或 'original'")
+
+        if self.get('output_width_option') not in ["uniform", "original"]:
+            raise ValueError("配置 'output_width_option' 必须是 'uniform' 或 'original'")
 
         watermark_path = self.get('watermark_path')
         if watermark_path and not os.path.isfile(watermark_path):

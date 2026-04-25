@@ -28,7 +28,7 @@ class WatermarkService:
         """
         为指定的单个图片创建水印预览。
 
-        此方法会按照与实际处理相同的顺序：先统一宽度，再添加水印。
+        此方法会按照与实际处理相同的顺序：先统一宽度，再添加水印，最后调整输出宽度。
         如果水印未设置，则返回调整宽度后的图片。
 
         Args:
@@ -43,7 +43,7 @@ class WatermarkService:
         try:
             image = Image.open(image_path)
 
-            # 第一步：根据配置统一图像宽度（与实际处理保持一致）
+            # 第一步：根据配置统一水印前素材宽度
             target_width = self.config.get('target_width')
             if self.config.get('width_option') == 'uniform':
                 image = resize_image(image, target_width)
@@ -53,11 +53,18 @@ class WatermarkService:
             if not watermark_image:
                 return image  # 如果没有水印，返回调整宽度后的图片
 
-            return apply_watermark(
+            image = apply_watermark(
                 image,
                 watermark_image,
                 self.config.get('opacity')
             )
+
+            # 第三步：根据配置调整输出宽度
+            output_target_width = self.config.get('output_target_width')
+            if self.config.get('output_width_option') == 'uniform':
+                image = resize_image(image, output_target_width)
+
+            return image
         except Exception as e:
             logger.error(f"创建预览失败: {e}")
             raise
@@ -102,13 +109,14 @@ class WatermarkService:
 
     def process_single_image(self, image_path: str):
         """
-        处理单个图片文件：先统一宽度，再添加水印，最后保存到输出目录。
+        处理单个图片文件：先统一宽度，再添加水印，最后调整输出宽度并保存。
 
         处理顺序：
         1. 加载原始图片
-        2. 根据配置统一图片宽度（如果需要）
+        2. 根据配置统一水印前素材宽度（如果需要）
         3. 添加水印
-        4. 保存到输出文件夹
+        4. 根据配置调整输出宽度（如果需要）
+        5. 保存到输出文件夹
 
         Args:
             image_path (str): 要处理的图片的完整路径。
@@ -119,7 +127,7 @@ class WatermarkService:
         try:
             image = Image.open(image_path)
 
-            # 第一步：根据配置统一图像宽度
+            # 第一步：根据配置统一水印前素材宽度
             target_width = self.config.get('target_width')
             if self.config.get('width_option') == 'uniform':
                 image = resize_image(image, target_width)
@@ -133,7 +141,12 @@ class WatermarkService:
                     self.config.get('opacity')
                 )
 
-            # 第三步：保存图片
+            # 第三步：根据配置调整输出宽度
+            output_target_width = self.config.get('output_target_width')
+            if self.config.get('output_width_option') == 'uniform':
+                image = resize_image(image, output_target_width)
+
+            # 第四步：保存图片
             output_path = os.path.join(self.config.get('output_folder'), os.path.basename(image_path))
 
             # 对于有损格式，确保在保存前转换为 RGB

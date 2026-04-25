@@ -26,12 +26,16 @@ class WatermarkGUI:
         self.output_folder = tk.StringVar()
         self.watermark_path = tk.StringVar()
         self.opacity = tk.DoubleVar(value=self.config.get('opacity', 1.0))
-        self.target_width_var = tk.IntVar(value=self.config.get('target_width', 800))
-        self.width_option = tk.StringVar(value=self.config.get('width_option', "uniform"))
+        self.target_width_var = tk.IntVar(value=self.config.get('target_width', 1440))
+        self.width_option = tk.StringVar(value=self.config.get('width_option', "original"))
+        self.output_width_option = tk.StringVar(value=self.config.get('output_width_option', "original"))
+        self.output_target_width_var = tk.IntVar(value=self.config.get('output_target_width', 1440))
 
         # 为变量添加trace回调，当值改变时自动更新预览
         self.target_width_var.trace('w', self.on_setting_changed)
         self.width_option.trace('w', self.on_setting_changed)
+        self.output_width_option.trace('w', self.on_setting_changed)
+        self.output_target_width_var.trace('w', self.on_setting_changed)
         self.opacity.trace('w', self.on_setting_changed)
         self.watermark_path.trace('w', self.on_watermark_changed)
         self.input_folder.trace('w', self.on_input_folder_changed)
@@ -80,7 +84,7 @@ class WatermarkGUI:
     def create_settings_panel(self, parent):
         """创建设置面板"""
         # 水印图片选择
-        ttk.Label(parent, text="水印图片（800*800）:").pack(anchor=tk.W, padx=5, pady=2)
+        ttk.Label(parent, text="水印图片:").pack(anchor=tk.W, padx=5, pady=2)
         watermark_frame = ttk.Frame(parent)
         watermark_frame.pack(fill=tk.X, padx=5, pady=2)
         watermark_entry = ttk.Entry(watermark_frame, textvariable=self.watermark_path)
@@ -91,23 +95,40 @@ class WatermarkGUI:
         ttk.Button(watermark_frame, text="选择水印", command=self.select_watermark).pack(side=tk.RIGHT)
         
         # 目标宽度输入
-        ttk.Label(parent, text="统一输出图片宽度（像素）:").pack(anchor=tk.W, padx=5, pady=2)
-        target_width_entry = ttk.Entry(parent, textvariable=self.target_width_var)
-        target_width_entry.pack(fill=tk.X, padx=5, pady=2)
-        # 绑定目标宽度变化事件
-        target_width_entry.bind("<KeyRelease>", self.on_setting_changed)
-        target_width_entry.bind("<FocusOut>", self.on_setting_changed)
+        ttk.Label(parent, text="统一输入素材宽度:").pack(anchor=tk.W, padx=5, pady=2)
+        target_width_frame = ttk.Frame(parent)
+        target_width_frame.pack(fill=tk.X, padx=5, pady=2)
 
-        # 选择宽度选项
-        width_option_frame = ttk.Frame(parent)  # 新建一个框架
-        width_option_frame.pack(anchor=tk.W, padx=5, pady=2)
-        uniform_radio = ttk.Radiobutton(width_option_frame, text="统一宽度", variable=self.width_option, value="uniform")
+        original_radio = ttk.Radiobutton(target_width_frame, text="保持原始", variable=self.width_option, value="original")
+        original_radio.pack(side=tk.LEFT)
+        original_radio.bind("<Button-1>", self.on_setting_changed)
+
+        uniform_radio = ttk.Radiobutton(target_width_frame, text="统一", variable=self.width_option, value="uniform")
         uniform_radio.pack(side=tk.LEFT)
         uniform_radio.bind("<Button-1>", self.on_setting_changed)
 
-        original_radio = ttk.Radiobutton(width_option_frame, text="保持原始宽度", variable=self.width_option, value="original")
-        original_radio.pack(side=tk.LEFT)
-        original_radio.bind("<Button-1>", self.on_setting_changed)
+        target_width_entry = ttk.Entry(target_width_frame, textvariable=self.target_width_var, width=10)
+        target_width_entry.pack(side=tk.LEFT, padx=5)
+        target_width_entry.bind("<KeyRelease>", self.on_setting_changed)
+        target_width_entry.bind("<FocusOut>", self.on_setting_changed)
+
+        # 输出宽度选项
+        ttk.Label(parent, text="统一输出图片宽度:").pack(anchor=tk.W, padx=5, pady=2)
+        output_width_frame = ttk.Frame(parent)
+        output_width_frame.pack(fill=tk.X, padx=5, pady=2)
+
+        output_original_radio = ttk.Radiobutton(output_width_frame, text="保持原始", variable=self.output_width_option, value="original")
+        output_original_radio.pack(side=tk.LEFT)
+        output_original_radio.bind("<Button-1>", self.on_setting_changed)
+
+        output_uniform_radio = ttk.Radiobutton(output_width_frame, text="统一", variable=self.output_width_option, value="uniform")
+        output_uniform_radio.pack(side=tk.LEFT)
+        output_uniform_radio.bind("<Button-1>", self.on_setting_changed)
+
+        output_width_entry = ttk.Entry(output_width_frame, textvariable=self.output_target_width_var, width=10)
+        output_width_entry.pack(side=tk.LEFT, padx=5)
+        output_width_entry.bind("<KeyRelease>", self.on_setting_changed)
+        output_width_entry.bind("<FocusOut>", self.on_setting_changed)
 
         # 透明度
         ttk.Label(parent, text="不透明度:").pack(anchor=tk.W, padx=5, pady=2)
@@ -392,7 +413,9 @@ class WatermarkGUI:
             watermark_path=self.watermark_path.get(),
             opacity=self.opacity.get(),
             target_width=self.target_width_var.get(),
-            width_option=self.width_option.get()
+            width_option=self.width_option.get(),
+            output_width_option=self.output_width_option.get(),
+            output_target_width=self.output_target_width_var.get()
         )
         self.config.save()
 
@@ -401,15 +424,22 @@ class WatermarkGUI:
         self.config.load()
         self.watermark_path.set(self.config.get('watermark_path', ''))
         self.opacity.set(self.config.get('opacity', 1.0))
-        self.target_width_var.set(self.config.get('target_width', 800))
-        self.width_option.set(self.config.get('width_option', 'uniform'))
+        self.target_width_var.set(self.config.get('target_width', 1440))
+        self.width_option.set(self.config.get('width_option', 'original'))
+        self.output_width_option.set(self.config.get('output_width_option', 'original'))
+        self.output_target_width_var.set(self.config.get('output_target_width', 1440))
 
     def on_setting_changed(self, *args):
         """当设置改变时更新预览"""
         # 使用after方法延迟更新，避免频繁刷新
         if hasattr(self, '_update_timer'):
             self.window.after_cancel(self._update_timer)
-        self._update_timer = self.window.after(100, self.update_preview)
+        self._update_timer = self.window.after(100, self._update_and_save)
+
+    def _update_and_save(self):
+        """更新预览并保存配置"""
+        self.update_preview()
+        self.save_config()
 
     def on_watermark_changed(self, *args):
         """当水印路径改变时更新预览"""
